@@ -7,7 +7,7 @@ import java.util.List;
  * User: ton Date: 01.07.13 Time: 11:16
  */
 public class DelayLine<T> {
-    private double delay;
+    private double delay = 0.0;
     private List<Tick<T>> buffer = new LinkedList<Tick<T>>();
     T value = null;
 
