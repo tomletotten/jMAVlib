@@ -6,6 +6,8 @@ Java library for MAV applications (MAVLink, PX4)
 Licensing
 ---------
 
+Copyright (c) 2014 Anton Babushkin. All rights reserved.
+
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
  are met:
