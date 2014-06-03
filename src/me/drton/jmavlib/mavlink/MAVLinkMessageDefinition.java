@@ -33,7 +33,7 @@ public class MAVLinkMessageDefinition {
     }
 
     private byte calculateExtraCRC() {
-        String extraCrcBuffer = name + " ";
+        String extraCRCStr = name + " ";
         MAVLinkField[] fieldsSorted = fields.clone();
         Arrays.sort(fieldsSorted, new Comparator<MAVLinkField>() {
             @Override
@@ -48,13 +48,12 @@ public class MAVLinkMessageDefinition {
             }
         });
         for (MAVLinkField field : fieldsSorted) {
-            extraCrcBuffer += field.type.ctype + " " + field.name + " ";
-            // TODO arrays support
-            //if (type.isArray) {
-            //    extraCrcBuffer = extraCrcBuffer + (char) type.arrayLenth;
-            //}
+            extraCRCStr += field.type.ctype + " " + field.name + " ";
+            if (field.isArray()) {
+                extraCRCStr += (char) field.arraySize;
+            }
         }
-        int extraCRCRaw = MAVLinkCRC.calculateCRC(extraCrcBuffer.getBytes(Charset.forName("latin1")));
+        int extraCRCRaw = MAVLinkCRC.calculateCRC(extraCRCStr.getBytes(Charset.forName("latin1")));
         return (byte) ((extraCRCRaw & 0x00FF) ^ ((extraCRCRaw >> 8 & 0x00FF)));
     }
 }

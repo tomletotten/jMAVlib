@@ -76,23 +76,37 @@ public class MAVLinkMessage {
     }
 
     public Object get(MAVLinkField field) {
-        switch (field.type) {
+        if (field.arraySize > 1) {
+            Object[] res = new Object[field.arraySize];
+            int offs = field.offset;
+            for (int i = 0; i < field.arraySize; i++) {
+                res[i] = getValue(field.type, offs);
+                offs += field.type.size;
+            }
+            return res;
+        } else {
+            return getValue(field.type, field.offset);
+        }
+    }
+
+    private Object getValue(MAVLinkDataType type, int offset) {
+        switch (type) {
             case INT8:
-                return (int) data.get(field.offset);
+                return (int) data.get(offset);
             case UINT8:
-                return data.get(field.offset) & 0xFF;
+                return data.get(offset) & 0xFF;
             case INT16:
-                return (int) data.getShort(field.offset);
+                return (int) data.getShort(offset);
             case UINT16:
-                return data.getShort(field.offset) & 0xFFFF;
+                return data.getShort(offset) & 0xFFFF;
             case INT32:
-                return data.getInt(field.offset);
+                return data.getInt(offset);
             case UINT32:
-                return data.getInt(field.offset) & 0xFFFFFFFFl;
+                return data.getInt(offset) & 0xFFFFFFFFl;
             case FLOAT:
-                return data.getFloat(field.offset);
+                return data.getFloat(offset);
             default:
-                throw new RuntimeException("Unknown type: " + field.type);
+                throw new RuntimeException("Unknown type: " + type);
         }
     }
 
