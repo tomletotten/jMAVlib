@@ -37,11 +37,11 @@ public class DelayLine<T> {
         return value;
     }
 
-    private static class Tick<V> {
+    public static class Tick<V> {
         public final double time;
         public final V value;
 
-        private Tick(double time, V value) {
+        public Tick(double time, V value) {
             this.time = time;
             this.value = value;
         }
