@@ -24,8 +24,7 @@ public class DelayLine<T> {
         this.delay = delay;
     }
 
-    public T getOutput(double time, T in) {
-        buffer.add(new Tick<T>(time, in));
+    public T getOutput(double time) {
         while (!buffer.isEmpty()) {
             Tick<T> tick = buffer.get(0);
             if (time - tick.time < delay) {
@@ -35,6 +34,11 @@ public class DelayLine<T> {
             buffer.remove(0);
         }
         return value;
+    }
+
+    public T getOutput(double time, T in) {
+        buffer.add(new Tick<T>(time, in));
+        return getOutput(time);
     }
 
     public static class Tick<V> {
