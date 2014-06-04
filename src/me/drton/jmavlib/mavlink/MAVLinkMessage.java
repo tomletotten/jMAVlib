@@ -92,7 +92,7 @@ public class MAVLinkMessage {
         }
         if (payloadLen != definition.payloadLength) {
             throw new MAVLinkUnknownMessage(
-                    String.format("Invalid payload len for msg %s (%s): %02x, should be %02x", definition.name, msgID,
+                    String.format("Invalid payload len for msg %s (%s): %s, should be %s", definition.name, msgID,
                             payloadLen, definition.payloadLength));
         }
         this.payload = new byte[definition.payloadLength];

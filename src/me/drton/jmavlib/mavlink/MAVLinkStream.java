@@ -10,13 +10,17 @@ import java.nio.channels.ByteChannel;
  */
 public class MAVLinkStream {
     private final MAVLinkSchema schema;
-    private byte rxSeq = 0;
     private byte txSeq = 0;
     private ByteBuffer buffer = ByteBuffer.allocate(8192);
+    private boolean debug = false;
 
     public MAVLinkStream(MAVLinkSchema schema) {
         this.schema = schema;
         buffer.flip();
+    }
+
+    public void setDebug(boolean debug) {
+        this.debug = debug;
     }
 
     public ByteBuffer write(MAVLinkMessage msg) throws IOException {
@@ -39,7 +43,9 @@ public class MAVLinkStream {
                 buffer.get();
             } catch (MAVLinkUnknownMessage mavLinkUnknownMessage) {
                 // Message looks ok but with another protocol, skip it
-                mavLinkUnknownMessage.printStackTrace();
+                if (debug) {
+                    mavLinkUnknownMessage.printStackTrace();
+                }
             }
         }
         return null;
@@ -58,7 +64,10 @@ public class MAVLinkStream {
                 buffer.reset();
                 buffer.get();
             } catch (MAVLinkUnknownMessage mavLinkUnknownMessage) {
-                mavLinkUnknownMessage.printStackTrace();
+                // Message looks ok but with another protocol, skip it
+                if (debug) {
+                    mavLinkUnknownMessage.printStackTrace();
+                }
             } catch (BufferUnderflowException underflow) {
                 return null;
             }
