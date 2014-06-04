@@ -10,6 +10,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -20,6 +21,7 @@ import java.util.Map;
  */
 public class MAVLinkSchema {
     private byte startSign = (byte) 0xFE;
+    private ByteOrder byteOrder = ByteOrder.LITTLE_ENDIAN;
     private final MAVLinkMessageDefinition[] definitions = new MAVLinkMessageDefinition[256];
     private final Map<String, MAVLinkMessageDefinition> definitionsByName
             = new HashMap<String, MAVLinkMessageDefinition>();
@@ -31,6 +33,10 @@ public class MAVLinkSchema {
 
     public byte getStartSign() {
         return startSign;
+    }
+
+    public ByteOrder getByteOrder() {
+        return byteOrder;
     }
 
     private void processXMLFile(String xmlFileName) throws IOException, SAXException, ParserConfigurationException {

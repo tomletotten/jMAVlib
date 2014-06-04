@@ -33,6 +33,7 @@ public class MAVLinkMessage {
         }
         this.payload = new byte[definition.payloadLength];
         this.payloadBB = ByteBuffer.wrap(payload);
+        payloadBB.order(schema.getByteOrder());
         this.systemID = systemID;
         this.componentID = componentID;
         this.msgID = msgID;
@@ -52,6 +53,7 @@ public class MAVLinkMessage {
         }
         this.payload = new byte[definition.payloadLength];
         this.payloadBB = ByteBuffer.wrap(payload);
+        payloadBB.order(schema.getByteOrder());
         this.systemID = systemID;
         this.componentID = componentID;
         this.msgID = definition.id;
@@ -106,11 +108,13 @@ public class MAVLinkMessage {
                             crcCalc));
         }
         this.payloadBB = ByteBuffer.wrap(payload);
+        payloadBB.order(schema.getByteOrder());
     }
 
     public ByteBuffer encode(byte sequence) {
         this.sequence = sequence;
         ByteBuffer buf = ByteBuffer.allocate(payload.length + 8);
+        buf.order(schema.getByteOrder());
         buf.put(schema.getStartSign());
         buf.put((byte) definition.payloadLength);
         buf.put(sequence);
@@ -169,7 +173,7 @@ public class MAVLinkMessage {
                     sb.append((char) c);
                 }
                 return sb.toString();
-            }else {
+            } else {
                 return res;
             }
         } else {
@@ -186,21 +190,21 @@ public class MAVLinkMessage {
             case INT8:
                 return (int) payloadBB.get(offset);
             case UINT16:
-                return Short.reverseBytes(payloadBB.getShort(offset)) & 0xFFFF;
+                return payloadBB.getShort(offset) & 0xFFFF;
             case INT16:
-                return (int) Short.reverseBytes(payloadBB.getShort(offset));
+                return (int) payloadBB.getShort(offset);
             case UINT32:
-                return Integer.reverseBytes(payloadBB.getInt(offset)) & 0xFFFFFFFFl;
+                return payloadBB.getInt(offset) & 0xFFFFFFFFl;
             case INT32:
-                return Integer.reverseBytes(payloadBB.getInt(offset));
+                return payloadBB.getInt(offset);
             case UINT64:
-                return Long.reverseBytes(payloadBB.getLong(offset));
+                return payloadBB.getLong(offset);
             case INT64:
-                return Long.reverseBytes(payloadBB.getLong(offset));
+                return payloadBB.getLong(offset);
             case FLOAT:
-                return Float.intBitsToFloat(Integer.reverseBytes(payloadBB.getInt(offset)));
+                return payloadBB.getFloat(offset);
             case DOUBLE:
-                return Double.longBitsToDouble(Long.reverseBytes(payloadBB.getLong(offset)));
+                return payloadBB.getDouble(offset);
             default:
                 throw new RuntimeException("Unknown type: " + type);
         }
