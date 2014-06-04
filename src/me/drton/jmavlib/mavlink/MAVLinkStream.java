@@ -1,6 +1,7 @@
 package me.drton.jmavlib.mavlink;
 
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 
@@ -48,8 +49,8 @@ public class MAVLinkStream {
         buffer.compact();
         channel.read(buffer);
         buffer.flip();
-        while (buffer.remaining() >= 8) {
-            // Got header, try to parse message
+
+        while (true) {
             buffer.mark();
             try {
                 return new MAVLinkMessage(schema, buffer);
@@ -58,8 +59,9 @@ public class MAVLinkStream {
                 buffer.get();
             } catch (MAVLinkUnknownMessage mavLinkUnknownMessage) {
                 mavLinkUnknownMessage.printStackTrace();
+            } catch (BufferUnderflowException underflow) {
+                return null;
             }
         }
-        return null;
     }
 }

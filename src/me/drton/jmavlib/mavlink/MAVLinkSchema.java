@@ -10,6 +10,8 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -55,7 +57,6 @@ public class MAVLinkSchema {
             String msgName = msg.getAttribute("name");
             NodeList fieldsElems = msg.getElementsByTagName("field");
             MAVLinkField[] fields = new MAVLinkField[fieldsElems.getLength()];
-            int offset = 0;
             for (int j = 0; j < fieldsElems.getLength(); j++) {
                 Element fieldElem = (Element) fieldsElems.item(j);
                 String[] typeStr = fieldElem.getAttribute("type").split("\\[");
@@ -64,10 +65,21 @@ public class MAVLinkSchema {
                 if (typeStr.length > 1) {
                     arraySize = Integer.parseInt(typeStr[1].split("\\]")[0]);
                 }
-                MAVLinkField field = new MAVLinkField(fieldType, arraySize, fieldElem.getAttribute("name"), offset);
+                MAVLinkField field = new MAVLinkField(fieldType, arraySize, fieldElem.getAttribute("name"));
                 fields[j] = field;
-                offset += field.size;
             }
+            Arrays.sort(fields, new Comparator<MAVLinkField>() {
+                @Override
+                public int compare(MAVLinkField field2, MAVLinkField field1) {
+                    // Sort on type size
+                    if (field1.type.size > field2.type.size) {
+                        return 1;
+                    } else if (field1.type.size < field2.type.size) {
+                        return -1;
+                    }
+                    return 0;
+                }
+            });
             addMessageDefinition(new MAVLinkMessageDefinition(msgID, msgName, fields));
         }
     }

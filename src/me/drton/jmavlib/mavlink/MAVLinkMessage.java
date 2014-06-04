@@ -1,5 +1,6 @@
 package me.drton.jmavlib.mavlink;
 
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
 /**
@@ -62,7 +63,10 @@ public class MAVLinkMessage {
      * @param schema
      */
     public MAVLinkMessage(MAVLinkSchema schema, ByteBuffer buffer)
-            throws MAVLinkProtocolException, MAVLinkUnknownMessage {
+            throws MAVLinkProtocolException, MAVLinkUnknownMessage, BufferUnderflowException {
+        if (buffer.remaining() < 8) {
+            throw new BufferUnderflowException();
+        }
         int startPos = buffer.position();
         byte startSign = buffer.get();
         if (startSign != schema.getStartSign()) {
@@ -70,20 +74,23 @@ public class MAVLinkMessage {
                     String.format("Invalid start sign: %02x, should be %02x", startSign, schema.getStartSign()));
         }
         int payloadLen = buffer.get() & 0xff;
+        if (buffer.remaining() < payloadLen + 6) {
+            throw new BufferUnderflowException();
+        }
         sequence = buffer.get();
         systemID = buffer.get() & 0xff;
         componentID = buffer.get() & 0xff;
-        int msgID = buffer.get() & 0xff;
+        msgID = buffer.get() & 0xff;
         this.schema = schema;
         this.definition = schema.getMessageDefinition(msgID);
         if (definition == null) {
             // Unknown message skip it
             buffer.position(buffer.position() + payloadLen + 2);
-            throw new MAVLinkUnknownMessage(String.format("Unknown message: %02x", msgID));
+            throw new MAVLinkUnknownMessage(String.format("Unknown message: %s", msgID));
         }
         if (payloadLen != definition.payloadLength) {
             throw new MAVLinkUnknownMessage(
-                    String.format("Invalid payload len for msgID %s (%s): %02x, should be %02x", definition.name, msgID,
+                    String.format("Invalid payload len for msg %s (%s): %02x, should be %02x", definition.name, msgID,
                             payloadLen, definition.payloadLength));
         }
         this.payload = new byte[definition.payloadLength];
@@ -95,7 +102,7 @@ public class MAVLinkMessage {
         buffer.position(endPos);
         if (crc != crcCalc) {
             throw new MAVLinkUnknownMessage(
-                    String.format("CRC error for msgID %s (%s): %02x, should be %02x", definition.name, msgID, crc,
+                    String.format("CRC error for msg %s (%s): %02x, should be %02x", definition.name, msgID, crc,
                             crcCalc));
         }
         this.payloadBB = ByteBuffer.wrap(payload);
@@ -152,7 +159,19 @@ public class MAVLinkMessage {
                 res[i] = getValue(field.type, offs);
                 offs += field.type.size;
             }
-            return res;
+            if (field.type == MAVLinkDataType.CHAR) {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < res.length; i++) {
+                    byte c = (Byte) res[i];
+                    if (c == 0) {
+                        break;
+                    }
+                    sb.append((char) c);
+                }
+                return sb.toString();
+            }else {
+                return res;
+            }
         } else {
             return getValue(field.type, field.offset);
         }
@@ -161,27 +180,27 @@ public class MAVLinkMessage {
     private Object getValue(MAVLinkDataType type, int offset) {
         switch (type) {
             case CHAR:
-                return (char) payloadBB.get(offset);
+                return payloadBB.get(offset);
             case UINT8:
                 return payloadBB.get(offset) & 0xFF;
             case INT8:
                 return (int) payloadBB.get(offset);
             case UINT16:
-                return payloadBB.getShort(offset) & 0xFFFF;
+                return Short.reverseBytes(payloadBB.getShort(offset)) & 0xFFFF;
             case INT16:
-                return (int) payloadBB.getShort(offset);
+                return (int) Short.reverseBytes(payloadBB.getShort(offset));
             case UINT32:
-                return payloadBB.getInt(offset) & 0xFFFFFFFFl;
+                return Integer.reverseBytes(payloadBB.getInt(offset)) & 0xFFFFFFFFl;
             case INT32:
-                return payloadBB.getInt(offset);
+                return Integer.reverseBytes(payloadBB.getInt(offset));
             case UINT64:
-                return payloadBB.getLong(offset);
+                return Long.reverseBytes(payloadBB.getLong(offset));
             case INT64:
-                return payloadBB.getLong(offset);
+                return Long.reverseBytes(payloadBB.getLong(offset));
             case FLOAT:
-                return payloadBB.getFloat(offset);
+                return Float.intBitsToFloat(Integer.reverseBytes(payloadBB.getInt(offset)));
             case DOUBLE:
-                return payloadBB.getDouble(offset);
+                return Double.longBitsToDouble(Long.reverseBytes(payloadBB.getLong(offset)));
             default:
                 throw new RuntimeException("Unknown type: " + type);
         }
@@ -200,6 +219,10 @@ public class MAVLinkMessage {
             case INT32:
             case UINT32:
                 payloadBB.putInt(field.offset, ((Number) value).intValue());
+                break;
+            case INT64:
+            case UINT64:
+                payloadBB.putLong(field.offset, ((Number) value).longValue());
                 break;
             case FLOAT:
                 payloadBB.putFloat(field.offset, ((Number) value).floatValue());
@@ -258,11 +281,11 @@ public class MAVLinkMessage {
     }
 
     public String getString(int fieldID) {
-        return new String((byte[]) get(fieldID));
+        return (String) get(fieldID);
     }
 
     public String getString(String fieldName) {
-        return new String((byte[]) get(fieldName));
+        return (String) get(fieldName);
     }
 
     @Override

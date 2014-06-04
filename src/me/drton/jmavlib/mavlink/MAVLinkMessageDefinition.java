@@ -25,6 +25,7 @@ public class MAVLinkMessageDefinition {
         int len = 0;
         for (MAVLinkField field : fields) {
             fieldsByName.put(field.name, field);
+            field.offset = len;
             len += field.size;
         }
         this.payloadLength = len;
@@ -33,20 +34,7 @@ public class MAVLinkMessageDefinition {
 
     private byte calculateExtraCRC() {
         String extraCRCStr = name + " ";
-        MAVLinkField[] fieldsSorted = fields.clone();
-        Arrays.sort(fieldsSorted, new Comparator<MAVLinkField>() {
-            @Override
-            public int compare(MAVLinkField field2, MAVLinkField field1) {
-                // Sort on type size
-                if (field1.type.size > field2.type.size) {
-                    return 1;
-                } else if (field1.type.size < field2.type.size) {
-                    return -1;
-                }
-                return 0;
-            }
-        });
-        for (MAVLinkField field : fieldsSorted) {
+        for (MAVLinkField field : fields) {
             extraCRCStr += field.type.ctype + " " + field.name + " ";
             if (field.isArray()) {
                 extraCRCStr += (char) field.arraySize;
