@@ -17,6 +17,7 @@ import java.util.Map;
  * User: ton Date: 03.06.14 Time: 12:31
  */
 public class MAVLinkSchema {
+    private byte startSign = (byte) 0xFE;
     private final MAVLinkMessageDefinition[] definitions = new MAVLinkMessageDefinition[256];
     private final Map<String, MAVLinkMessageDefinition> definitionsByName
             = new HashMap<String, MAVLinkMessageDefinition>();
@@ -24,6 +25,10 @@ public class MAVLinkSchema {
 
     public MAVLinkSchema(String xmlFileName) throws ParserConfigurationException, IOException, SAXException {
         processXMLFile(xmlFileName);
+    }
+
+    public byte getStartSign() {
+        return startSign;
     }
 
     private void processXMLFile(String xmlFileName) throws IOException, SAXException, ParserConfigurationException {
@@ -50,7 +55,7 @@ public class MAVLinkSchema {
             String msgName = msg.getAttribute("name");
             NodeList fieldsElems = msg.getElementsByTagName("field");
             MAVLinkField[] fields = new MAVLinkField[fieldsElems.getLength()];
-            int offset = MAVLinkMessage.DATA_OFFSET;
+            int offset = 0;
             for (int j = 0; j < fieldsElems.getLength(); j++) {
                 Element fieldElem = (Element) fieldsElems.item(j);
                 String[] typeStr = fieldElem.getAttribute("type").split("\\[");

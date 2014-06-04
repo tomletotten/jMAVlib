@@ -10,13 +10,12 @@ import java.util.Map;
  * User: ton Date: 03.06.14 Time: 12:33
  */
 public class MAVLinkMessageDefinition {
-    public final byte startSign = (byte) 0xFE;
     public final int id;
     public final String name;
     public final byte extraCRC;
     public final Map<String, MAVLinkField> fieldsByName;
     public final MAVLinkField[] fields;
-    public final int length;
+    public final int payloadLength;
 
     public MAVLinkMessageDefinition(int id, String name, MAVLinkField[] fields) {
         this.id = id;
@@ -28,7 +27,7 @@ public class MAVLinkMessageDefinition {
             fieldsByName.put(field.name, field);
             len += field.size;
         }
-        this.length = len;
+        this.payloadLength = len;
         this.extraCRC = calculateExtraCRC();
     }
 
@@ -39,9 +38,9 @@ public class MAVLinkMessageDefinition {
             @Override
             public int compare(MAVLinkField field2, MAVLinkField field1) {
                 // Sort on type size
-                if (field1.size > field2.size) {
+                if (field1.type.size > field2.type.size) {
                     return 1;
-                } else if (field1.size < field2.size) {
+                } else if (field1.type.size < field2.type.size) {
                     return -1;
                 }
                 return 0;
