@@ -6,7 +6,8 @@ import java.nio.ByteBuffer;
  * User: ton Date: 03.06.14 Time: 12:31
  */
 public class MAVLinkMessage {
-    private final int MSG_ID_OFFSET = 5;
+    private final static int MSG_ID_OFFSET = 5;
+    public final static int DATA_OFFSET = 6;
     private final MAVLinkMessageDefinition definition;
     private final ByteBuffer data;
 
@@ -30,6 +31,9 @@ public class MAVLinkMessage {
      */
     public MAVLinkMessage(MAVLinkSchema schema, String msgName, int systemID, int componentID) {
         this.definition = schema.getMessageDefinition(msgName);
+        if (definition == null) {
+            throw new RuntimeException("Unknown mavlink message: " + msgName);
+        }
         this.data = ByteBuffer.allocate(definition.length + 8);
         writeHeader(systemID, componentID);
     }

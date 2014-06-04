@@ -83,4 +83,33 @@ public enum MAVLinkDataType {
                 throw new RuntimeException("Unknown type: " + this);
         }
     }
+
+    public static MAVLinkDataType fromCType(String ctype) {
+        if ("char".equals(ctype)) {
+            return CHAR;
+        } else if ("uint8_t_mavlink_version".equals(ctype)) {
+            return UINT8;
+        } else if ("uint8_t".equals(ctype)) {
+            return UINT8;
+        } else if ("int8_t".equals(ctype)) {
+            return INT8;
+        } else if ("uint16_t".equals(ctype)) {
+            return UINT16;
+        } else if ("int16_t".equals(ctype)) {
+            return INT16;
+        } else if ("uint32_t".equals(ctype)) {
+            return UINT32;
+        } else if ("int32_t".equals(ctype)) {
+            return INT32;
+        } else if ("uint64_t".equals(ctype)) {
+            return UINT64;
+        } else if ("int64_t".equals(ctype)) {
+            return INT16;
+        } else if ("float".equals(ctype)) {
+            return FLOAT;
+        } else if ("double".equals(ctype)) {
+            return DOUBLE;
+        }
+        throw new RuntimeException("Unknown C type: " + ctype);
+    }
 }
