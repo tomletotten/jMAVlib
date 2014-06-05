@@ -2,6 +2,7 @@ package me.drton.jmavlib.mavlink;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 
 /**
  * User: ton Date: 03.06.14 Time: 12:31
@@ -18,6 +19,7 @@ public class MAVLinkMessage {
     private int systemID = 0;
     private int componentID = 0;
     private int crc = -1;
+    private Charset charset = Charset.forName("latin1");
 
     /**
      * Create empty message by message ID (for filling and sending)
@@ -211,28 +213,54 @@ public class MAVLinkMessage {
     }
 
     public void set(MAVLinkField field, Object value) {
-        switch (field.type) {
-            case INT8:
+        if (field.arraySize > 1) {
+            Object[] valueArray;
+            if (value instanceof String) {
+                String valueStr = (String) value;
+                valueArray = new Byte[field.arraySize];
+                for (int i = 0; i < field.arraySize; i++) {
+                    valueArray[i] = i < valueStr.length() ? (byte) valueStr.charAt(i) : 0;
+                }
+            } else {
+                valueArray = (Object[]) value;
+            }
+            int offset = field.offset;
+            for (int i = 0; i < field.arraySize; i++) {
+                setValue(field.type, offset, valueArray[i]);
+                offset += field.type.size;
+            }
+        } else {
+            setValue(field.type, field.offset, value);
+        }
+    }
+
+    private void setValue(MAVLinkDataType type, int offset, Object value) {
+        switch (type) {
+            case CHAR:
             case UINT8:
-                payloadBB.put(field.offset, ((Number) value).byteValue());
+            case INT8:
+                payloadBB.put(offset, ((Number) value).byteValue());
                 break;
-            case INT16:
             case UINT16:
-                payloadBB.putShort(field.offset, ((Number) value).shortValue());
+            case INT16:
+                payloadBB.putShort(offset, ((Number) value).shortValue());
                 break;
-            case INT32:
             case UINT32:
-                payloadBB.putInt(field.offset, ((Number) value).intValue());
+            case INT32:
+                payloadBB.putInt(offset, ((Number) value).intValue());
                 break;
-            case INT64:
             case UINT64:
-                payloadBB.putLong(field.offset, ((Number) value).longValue());
+            case INT64:
+                payloadBB.putLong(offset, ((Number) value).longValue());
                 break;
             case FLOAT:
-                payloadBB.putFloat(field.offset, ((Number) value).floatValue());
+                payloadBB.putFloat(offset, ((Number) value).floatValue());
+                break;
+            case DOUBLE:
+                payloadBB.putDouble(offset, ((Number) value).doubleValue());
                 break;
             default:
-                throw new RuntimeException("Unknown type: " + field.type);
+                throw new RuntimeException("Unknown type: " + type);
         }
     }
 
