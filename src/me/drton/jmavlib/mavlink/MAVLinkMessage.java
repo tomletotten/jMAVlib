@@ -11,13 +11,13 @@ public class MAVLinkMessage {
     private final static int MSG_ID_OFFSET = 5;
     public final static int DATA_OFFSET = 6;
     private final MAVLinkSchema schema;
-    private final MAVLinkMessageDefinition definition;
-    private int msgID;
+    public final MAVLinkMessageDefinition definition;
+    public final int msgID;
     private final byte[] payload;
     private final ByteBuffer payloadBB;
     private byte sequence = 0;
-    private int systemID = 0;
-    private int componentID = 0;
+    public final int systemID;
+    public final int componentID;
     private int crc = -1;
     private Charset charset = Charset.forName("latin1");
 
@@ -79,6 +79,7 @@ public class MAVLinkMessage {
         }
         int payloadLen = buffer.get() & 0xff;
         if (buffer.remaining() < payloadLen + 6) {
+            buffer.position(startPos);
             throw new BufferUnderflowException();
         }
         sequence = buffer.get();
@@ -93,6 +94,7 @@ public class MAVLinkMessage {
             throw new MAVLinkUnknownMessage(String.format("Unknown message: %s", msgID));
         }
         if (payloadLen != definition.payloadLength) {
+            buffer.position(buffer.position() + payloadLen + 2);
             throw new MAVLinkUnknownMessage(
                     String.format("Invalid payload len for msg %s (%s): %s, should be %s", definition.name, msgID,
                             payloadLen, definition.payloadLength));

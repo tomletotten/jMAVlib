@@ -98,6 +98,10 @@ public class MAVLinkSchema {
         return definitionsByName.get(msgName);
     }
 
+    public Map<String, MAVLinkMessageDefinition> getMessageDefinitions() {
+        return definitionsByName;
+    }
+
     public void addMessageDefinition(MAVLinkMessageDefinition definition) {
         definitions[definition.id] = definition;
         definitionsByName.put(definition.name, definition);
