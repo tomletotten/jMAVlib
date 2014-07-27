@@ -24,6 +24,26 @@ public class PX4LogReader extends BinaryLogReader {
     private long startMicroseconds = -1;
     private Map<String, Object> version = new HashMap<String, Object>();
     private Map<String, Object> parameters = new HashMap<String, Object>();
+    private static Map<String, String> formatNames = new HashMap<String, String>();
+
+    static {
+        formatNames.put("b", "int8");
+        formatNames.put("B", "uint8");
+        formatNames.put("L", "int32 * 1e-7 (lat/lon)");
+        formatNames.put("i", "int32");
+        formatNames.put("I", "uint32");
+        formatNames.put("q", "int64");
+        formatNames.put("Q", "uint64");
+        formatNames.put("f", "float");
+        formatNames.put("c", "int16 * 1e-2");
+        formatNames.put("C", "uint16 * 1e-2");
+        formatNames.put("e", "int32 * 1e-2");
+        formatNames.put("E", "uint32 * 1e-2");
+        formatNames.put("n", "char[4]");
+        formatNames.put("N", "char[16]");
+        formatNames.put("Z", "char[64]");
+        formatNames.put("M", "uint8 (mode)");
+    }
 
     public PX4LogReader(String fileName) throws IOException, FormatErrorException {
         super(fileName);
@@ -179,7 +199,8 @@ public class PX4LogReader extends BinaryLogReader {
                     messageDescriptions.put(msgDescr.type, msgDescr);
                     for (int i = 0; i < msgDescr.fields.length; i++) {
                         String field = msgDescr.fields[i];
-                        fieldsList.put(msgDescr.name + "." + field, Character.toString(msgDescr.format.charAt(i)));
+                        String format = formatNames.get(Character.toString(msgDescr.format.charAt(i)));
+                        fieldsList.put(msgDescr.name + "." + field, format);
                     }
                 } else {
                     // Data message, all formats are read
