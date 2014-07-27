@@ -1,9 +1,6 @@
 package me.drton.jmavlib.log;
 
-import me.drton.jmavlib.mavlink.MAVLinkField;
-import me.drton.jmavlib.mavlink.MAVLinkMessage;
-import me.drton.jmavlib.mavlink.MAVLinkSchema;
-import me.drton.jmavlib.mavlink.MAVLinkStream;
+import me.drton.jmavlib.mavlink.*;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -15,14 +12,25 @@ import java.util.*;
  */
 public class MAVLinkLogReader implements LogReader {
     private RandomAccessFile file;
-    private Map<String, String> fieldsFormats;
+    private Map<String, String> fieldsFormats = new HashMap<String, String>();
     private MAVLinkStream stream;
+    private Map<String, Object> parameters = new HashMap<String, Object>();
     private long time;
     private long sizeUpdates = -1;
     private long sizeMicroseconds = -1;
     private long startMicroseconds = -1;
+    private Set<Integer> skipMsgs = new HashSet<Integer>();
 
     public MAVLinkLogReader(String fileName, MAVLinkSchema schema) throws IOException, FormatErrorException {
+        String[] skipMsgNames = new String[]{
+                "PARAM_REQUEST_READ", "PARAM_REQUEST_LIST", "PARAM_VALUE", "PARAM_SET", "PARAM_VALUE",};
+        for (String msgName : skipMsgNames) {
+            MAVLinkMessageDefinition definition = schema.getMessageDefinition(msgName);
+            if (definition != null) {
+                skipMsgs.add(definition.id);
+            }
+        }
+
         file = new RandomAccessFile(fileName, "r");
         stream = new MAVLinkStream(schema, file.getChannel());
         updateInfo();
@@ -108,8 +116,19 @@ public class MAVLinkLogReader implements LogReader {
         }
     }
 
+    private Object parseMavlinkParameter(MAVLinkMessage msg) {
+        int type = msg.getInt("param_type");
+        float value = msg.getFloat("param_value");
+        if (type == MAVLinkDataType.FLOAT.id) {
+            return value;
+        } else if (type == MAVLinkDataType.INT32.id) {
+            return Float.floatToIntBits(value);
+        } else {
+            return value;
+        }
+    }
+
     private void updateInfo() throws IOException, FormatErrorException {
-        fieldsFormats = new HashMap<String, String>();
         Set<String> messagesSysIDs = new HashSet<String>();
         seek(0);
         long packetsNum = 0;
@@ -133,10 +152,14 @@ public class MAVLinkLogReader implements LogReader {
                 packetsNum++;
             }
 
-            String msgSysID = msg.systemID + ":" + msg.getMsgName();
-            if (!messagesSysIDs.contains(msgSysID)) {
-                messagesSysIDs.add(msgSysID);
-                addMessageFormat(msg);
+            if (msg.getMsgName().equals("PARAM_VALUE")) {
+                parameters.put("M" + msg.systemID + ":" + msg.getString("param_id"), parseMavlinkParameter(msg));
+            } else if (!skipMsgs.contains(msg.msgID)) {
+                String msgSysID = "M" + msg.systemID + ":" + msg.getMsgName();
+                if (!messagesSysIDs.contains(msgSysID)) {
+                    messagesSysIDs.add(msgSysID);
+                    addMessageFormat(msg);
+                }
             }
         }
         startMicroseconds = timeStart;
@@ -206,7 +229,7 @@ public class MAVLinkLogReader implements LogReader {
 
     @Override
     public Map<String, Object> getParameters() {
-        return Collections.emptyMap();
+        return parameters;
     }
 
     public static void main(String[] args) throws Exception {
