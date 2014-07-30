@@ -4,7 +4,9 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * User: ton Date: 03.06.13 Time: 14:18
@@ -15,18 +17,26 @@ public class PX4LogReader extends BinaryLogReader {
     private static final byte HEADER_HEAD2 = (byte) 0x95;
 
     private long dataStart = 0;
+    private boolean formatPX4 = false;
     private Map<Integer, PX4LogMessageDescription> messageDescriptions
             = new HashMap<Integer, PX4LogMessageDescription>();
     private Map<String, String> fieldsList = null;
     private long time = 0;
+    private PX4LogMessage lastMsg = null;
     private long sizeUpdates = -1;
     private long sizeMicroseconds = -1;
     private long startMicroseconds = -1;
     private Map<String, Object> version = new HashMap<String, Object>();
     private Map<String, Object> parameters = new HashMap<String, Object>();
+    private static Set<String> hideMsgs = new HashSet<String>();
     private static Map<String, String> formatNames = new HashMap<String, String>();
 
     static {
+        hideMsgs.add("PARM");
+        hideMsgs.add("FMT");
+        hideMsgs.add("TIME");
+        hideMsgs.add("VER");
+
         formatNames.put("b", "int8");
         formatNames.put("B", "uint8");
         formatNames.put("L", "int32 * 1e-7 (lat/lon)");
@@ -53,7 +63,7 @@ public class PX4LogReader extends BinaryLogReader {
 
     @Override
     public String getFormat() {
-        return "PX4";
+        return formatPX4 ? "PX4" : "APM";
     }
 
     @Override
@@ -93,16 +103,53 @@ public class PX4LogReader extends BinaryLogReader {
             } catch (EOFException e) {
                 break;
             }
-            if ("TIME".equals(msg.description.name)) {
-                long t = msg.getLong(0);
-                if (timeStart < 0) {
-                    timeStart = t;
+            // Time range
+            if (formatPX4) {
+                if ("TIME".equals(msg.description.name)) {
+                    long t = msg.getLong(0);
+                    if (timeStart < 0) {
+                        timeStart = t;
+                    }
+                    timeEnd = t;
                 }
-                timeEnd = t;
-                packetsNum++;
-            } else if ("VER".equals(msg.description.name)) {
-                version = msg.toMap();
-            } else if ("PARM".equals(msg.description.name)) {
+            } else {
+                long t = getTimestamp(msg);
+                if (t > 0) {
+                    if (timeStart < 0) {
+                        timeStart = t;
+                    }
+                    timeEnd = t;
+                }
+            }
+            packetsNum++;
+
+            // Version
+            if (formatPX4) {
+                if ("VER".equals(msg.description.name)) {
+                    String fw = (String) msg.get("FwGit");
+                    if (fw != null) {
+                        version.put("FW", fw);
+                    }
+                    String hw = (String) msg.get("Arch");
+                    if (hw != null) {
+                        version.put("HW", hw);
+                    }
+                }
+            } else {
+                if ("MSG".equals(msg.description.name)) {
+                    String s = (String) msg.get("Message");
+                    String fw = (String) version.get("FW");
+                    if (fw != null) {
+                        fw = fw + "; " + s;
+                    } else {
+                        fw = s;
+                    }
+                    version.put("FW", fw);
+                }
+            }
+
+            // Parameters
+            if ("PARM".equals(msg.description.name)) {
                 parameters.put((String) msg.get("Name"), msg.get("Value"));
             }
         }
@@ -115,10 +162,12 @@ public class PX4LogReader extends BinaryLogReader {
     @Override
     public boolean seek(long seekTime) throws IOException, FormatErrorException {
         position(dataStart);
+        lastMsg = null;
         if (seekTime == 0) {      // Seek to start of log
             time = 0;
             return true;
         }
+        // Seek to specified timestamp without parsing all messages
         try {
             while (true) {
                 buffer.mark();
@@ -134,18 +183,35 @@ public class PX4LogReader extends BinaryLogReader {
                     fillBuffer();
                     continue;
                 }
-                if ("TIME".equals(messageDescription.name)) {
-                    PX4LogMessage msg = messageDescription.parseMessage(buffer);
-                    long t = msg.getLong(0);
-                    if (t > seekTime) {
-                        // Time found
-                        time = t;
-                        buffer.reset();
-                        return true;
+                if (formatPX4) {
+                    if ("TIME".equals(messageDescription.name)) {
+                        PX4LogMessage msg = messageDescription.parseMessage(buffer);
+                        long t = msg.getLong(0);
+                        if (t > seekTime) {
+                            // Time found
+                            time = t;
+                            buffer.reset();
+                            return true;
+                        }
+                    } else {
+                        // Skip the message
+                        buffer.position(buffer.position() + bodyLen);
                     }
                 } else {
-                    // Skip the message
-                    buffer.position(buffer.position() + bodyLen);
+                    Integer idx = messageDescription.fieldsMap.get("TimeMS");
+                    if (idx != null && idx == 0) {
+                        PX4LogMessage msg = messageDescription.parseMessage(buffer);
+                        long t = msg.getLong(idx) * 1000;
+                        if (t > seekTime) {
+                            // Time found
+                            time = t;
+                            buffer.reset();
+                            return true;
+                        }
+                    } else {
+                        // Skip the message
+                        buffer.position(buffer.position() + bodyLen);
+                    }
                 }
             }
         } catch (EOFException e) {
@@ -153,25 +219,64 @@ public class PX4LogReader extends BinaryLogReader {
         }
     }
 
+    private long getTimestamp(PX4LogMessage msg) {
+        Integer idx = msg.description.fieldsMap.get("TimeMS");
+        if (idx != null && idx == 0) {
+            return msg.getLong(idx) * 1000;
+        }
+        return 0;
+    }
+
+    private void applyMsg(Map<String, Object> update, PX4LogMessage msg) {
+        String[] fields = msg.description.fields;
+        for (int i = 0; i < fields.length; i++) {
+            String field = fields[i];
+            if (i != 0 || !"TimeMS".equals(field)) {
+                update.put(msg.description.name + "." + field, msg.get(i));
+            }
+        }
+    }
+
     @Override
     public long readUpdate(Map<String, Object> update) throws IOException, FormatErrorException {
         long t = time;
+        if (lastMsg != null) {
+            applyMsg(update, lastMsg);
+            lastMsg = null;
+        }
         while (true) {
             PX4LogMessage msg = readMessage();
-            if ("TIME".equals(msg.description.name)) {
-                time = msg.getLong(0);
-                if (t == 0) {
-                    t = time;
-                    continue;
-                } else {
+
+            if (formatPX4) {
+                // PX4 log has TIME message
+                if ("TIME".equals(msg.description.name)) {
+                    time = msg.getLong(0);
+                    if (t == 0) {
+                        // The first TIME message
+                        t = time;
+                        continue;
+                    }
                     break;
                 }
+            } else {
+                // APM log doesn't have TIME message
+                long ts = getTimestamp(msg);
+                if (ts > 0) {
+                    time = ts;
+                    if (t == 0) {
+                        // The first message with timestamp
+                        t = time;
+                    } else {
+                        if (time > t) {
+                            // Timestamp changed, leave the message for future
+                            lastMsg = msg;
+                            break;
+                        }
+                    }
+                }
             }
-            String[] fields = msg.description.fields;
-            for (int i = 0; i < fields.length; i++) {
-                String field = fields[i];
-                update.put(msg.description.name + "." + field, msg.get(i));
-            }
+
+            applyMsg(update, msg);
         }
         return t;
     }
@@ -197,10 +302,17 @@ public class PX4LogReader extends BinaryLogReader {
                     // Message description
                     PX4LogMessageDescription msgDescr = new PX4LogMessageDescription(buffer);
                     messageDescriptions.put(msgDescr.type, msgDescr);
-                    for (int i = 0; i < msgDescr.fields.length; i++) {
-                        String field = msgDescr.fields[i];
-                        String format = formatNames.get(Character.toString(msgDescr.format.charAt(i)));
-                        fieldsList.put(msgDescr.name + "." + field, format);
+                    if ("TIME".equals(msgDescr.name)) {
+                        formatPX4 = true;
+                    }
+                    if (!hideMsgs.contains(msgDescr.name)) {
+                        for (int i = 0; i < msgDescr.fields.length; i++) {
+                            String field = msgDescr.fields[i];
+                            String format = formatNames.get(Character.toString(msgDescr.format.charAt(i)));
+                            if (i != 0 || !"TimeMS".equals(field)) {
+                                fieldsList.put(msgDescr.name + "." + field, format);
+                            }
+                        }
                     }
                 } else {
                     // Data message, all formats are read
@@ -244,7 +356,6 @@ public class PX4LogReader extends BinaryLogReader {
      * @throws EOFException on end of stream
      */
     public PX4LogMessage readMessage() throws IOException, FormatErrorException {
-        PX4LogMessage message;
         int msgType = readHeaderFillBuffer();
         PX4LogMessageDescription messageDescription = messageDescriptions.get(msgType);
         if (messageDescription == null) {

@@ -31,7 +31,8 @@ public class PX4LogMessageDescription {
     private static String getString(ByteBuffer buffer, int len) {
         byte[] strBuf = new byte[len];
         buffer.get(strBuf);
-        return new String(strBuf, charset).split("\0")[0];
+        String[] p = new String(strBuf, charset).split("\0");
+        return p.length > 0 ? p[0] : "";
     }
 
     public PX4LogMessageDescription(ByteBuffer buffer) {
@@ -39,13 +40,16 @@ public class PX4LogMessageDescription {
         length = buffer.get() & 0xFF;
         name = getString(buffer, 4);
         format = getString(buffer, 16);
-        fields = getString(buffer, 64).split(",");
-        if (fields.length != format.length()) {
-            throw new RuntimeException(String.format("Labels count != format length: fields = \"%s\", format = \"%s\"",
-                    Arrays.asList(fields), format));
-        }
-        for (int i = 0; i < fields.length; i++) {
-            fieldsMap.put(fields[i], i);
+        String fieldsStr = getString(buffer, 64);
+        fields = fieldsStr.length() > 0 ? fieldsStr.split(",") : new String[0];
+        if (!"FMT".equals(name)) {    // Workaround for buggy and useless APM "FMT" format
+            if (fields.length != format.length()) {
+                throw new RuntimeException(String.format("Labels count != format length: name = \"%s\" fields = %s, format = \"%s\"",
+                        name, Arrays.asList(fields), format));
+            }
+            for (int i = 0; i < fields.length; i++) {
+                fieldsMap.put(fields[i], i);
+            }
         }
     }
 
