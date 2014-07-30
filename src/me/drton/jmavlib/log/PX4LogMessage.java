@@ -25,8 +25,8 @@ public class PX4LogMessage {
     }
 
     public Object get(String field) {
-        int idx = description.getFieldIdx(field);
-        return data.get(idx);
+        Integer idx = description.fieldsMap.get(field);
+        return idx == null ? null : data.get(idx);
     }
 
     public Map<String, Object> toMap() {
