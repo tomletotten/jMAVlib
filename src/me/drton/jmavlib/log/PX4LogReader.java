@@ -292,39 +292,58 @@ public class PX4LogReader extends BinaryLogReader {
 
     private void readFormats() throws IOException, FormatErrorException {
         fieldsList = new HashMap<String, String>();
-        while (true) {
-            if (fillBuffer() < 0) {
-                break;
-            }
+        try {
             while (true) {
-                if (buffer.remaining() < PX4LogMessageDescription.FORMAT.length) {
+                if (fillBuffer() < 0) {
                     break;
                 }
-                buffer.mark();
-                int msgType = readHeader();     // Don't try to handle errors in formats
-                if (msgType == PX4LogMessageDescription.FORMAT.type) {
-                    // Message description
-                    PX4LogMessageDescription msgDescr = new PX4LogMessageDescription(buffer);
-                    messageDescriptions.put(msgDescr.type, msgDescr);
-                    if ("TIME".equals(msgDescr.name)) {
-                        formatPX4 = true;
+                while (true) {
+                    if (buffer.remaining() < HEADER_LEN) {
+                        break;
                     }
-                    if (!hideMsgs.contains(msgDescr.name)) {
-                        for (int i = 0; i < msgDescr.fields.length; i++) {
-                            String field = msgDescr.fields[i];
-                            String format = formatNames.get(Character.toString(msgDescr.format.charAt(i)));
-                            if (i != 0 || !"TimeMS".equals(field)) {
-                                fieldsList.put(msgDescr.name + "." + field, format);
+                    if (buffer.remaining() < PX4LogMessageDescription.FORMAT.length) {
+                        break;
+                    }
+                    buffer.mark();
+                    int msgType = readHeader();     // Don't try to handle errors in formats
+                    if (msgType == PX4LogMessageDescription.FORMAT.type) {
+                        // Message description
+                        PX4LogMessageDescription msgDescr = new PX4LogMessageDescription(buffer);
+                        messageDescriptions.put(msgDescr.type, msgDescr);
+                        if ("TIME".equals(msgDescr.name)) {
+                            formatPX4 = true;
+                        }
+                        if (!hideMsgs.contains(msgDescr.name)) {
+                            for (int i = 0; i < msgDescr.fields.length; i++) {
+                                String field = msgDescr.fields[i];
+                                String format = formatNames.get(Character.toString(msgDescr.format.charAt(i)));
+                                if (i != 0 || !"TimeMS".equals(field)) {
+                                    fieldsList.put(msgDescr.name + "." + field, format);
+                                }
                             }
                         }
+                    } else {
+                        // Data message
+                        if (formatPX4) {
+                            // If it's PX4 log then all formats are read
+                            buffer.reset();
+                            dataStart = position();
+                            return;
+                        } else {
+                            // APM may have format messages in the middle of log
+                            // Skip the message
+                            PX4LogMessageDescription messageDescription = messageDescriptions.get(msgType);
+                            if (messageDescription == null) {
+                                buffer.reset();
+                                throw new RuntimeException("Unknown message type: " + msgType);
+                            }
+                            int bodyLen = messageDescription.length - HEADER_LEN;
+                            buffer.position(buffer.position() + bodyLen);
+                        }
                     }
-                } else {
-                    // Data message, all formats are read
-                    buffer.reset();
-                    dataStart = position();
-                    return;
                 }
             }
+        } catch (EOFException ignored) {
         }
     }
 
