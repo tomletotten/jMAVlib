@@ -96,6 +96,8 @@ public class PX4LogReader extends BinaryLogReader {
         long packetsNum = 0;
         long timeStart = -1;
         long timeEnd = -1;
+        boolean parseVersion = true;
+        StringBuilder versionStr = new StringBuilder();
         while (true) {
             PX4LogMessage msg;
             try {
@@ -138,13 +140,14 @@ public class PX4LogReader extends BinaryLogReader {
             } else {
                 if ("MSG".equals(msg.description.name)) {
                     String s = (String) msg.get("Message");
-                    String fw = (String) version.get("FW");
-                    if (fw != null) {
-                        fw = fw + "; " + s;
+                    if (parseVersion && (s.startsWith("Ardu") || s.startsWith("PX4"))) {
+                        if (versionStr.length() > 0) {
+                            versionStr.append("; ");
+                        }
+                        versionStr.append(s);
                     } else {
-                        fw = s;
+                        parseVersion = false;
                     }
-                    version.put("FW", fw);
                 }
             }
 
@@ -156,6 +159,7 @@ public class PX4LogReader extends BinaryLogReader {
         startMicroseconds = timeStart;
         sizeUpdates = packetsNum;
         sizeMicroseconds = timeEnd - timeStart;
+        version.put("FW", versionStr.toString());
         seek(0);
     }
 
