@@ -159,7 +159,9 @@ public class PX4LogReader extends BinaryLogReader {
         startMicroseconds = timeStart;
         sizeUpdates = packetsNum;
         sizeMicroseconds = timeEnd - timeStart;
-        version.put("FW", versionStr.toString());
+        if (!formatPX4) {
+            version.put("FW", versionStr.toString());
+        }
         seek(0);
     }
 
