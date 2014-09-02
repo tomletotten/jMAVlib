@@ -223,6 +223,11 @@ public class MAVLinkLogReader implements LogReader {
     }
 
     @Override
+    public long getUTCTimeReferenceMicroseconds() {
+        return -1;  // Not supported
+    }
+
+    @Override
     public Map<String, Object> getVersion() {
         return Collections.emptyMap();
     }

@@ -65,6 +65,12 @@ public interface LogReader {
     long getSizeMicroseconds();
 
     /**
+     * Get UTC time reference as Unix time, i.e. UTC time of time 0 in the log.
+     * @return UTC time reference in us
+     */
+    long getUTCTimeReferenceMicroseconds();
+
+    /**
      * Get version of device that recorded the log (optional).
      *
      * @return version map or null if not supported by format

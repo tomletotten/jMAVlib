@@ -26,6 +26,7 @@ public class PX4LogReader extends BinaryLogReader {
     private long sizeUpdates = -1;
     private long sizeMicroseconds = -1;
     private long startMicroseconds = -1;
+    private long utcTimeReference = -1;
     private Map<String, Object> version = new HashMap<String, Object>();
     private Map<String, Object> parameters = new HashMap<String, Object>();
     private static Set<String> hideMsgs = new HashSet<String>();
@@ -82,6 +83,11 @@ public class PX4LogReader extends BinaryLogReader {
     }
 
     @Override
+    public long getUTCTimeReferenceMicroseconds() {
+        return utcTimeReference;
+    }
+
+    @Override
     public Map<String, Object> getVersion() {
         return version;
     }
@@ -115,7 +121,7 @@ public class PX4LogReader extends BinaryLogReader {
                     timeEnd = t;
                 }
             } else {
-                long t = getTimestamp(msg);
+                long t = getAPMTimestamp(msg);
                 if (t > 0) {
                     if (timeStart < 0) {
                         timeStart = t;
@@ -154,6 +160,30 @@ public class PX4LogReader extends BinaryLogReader {
             // Parameters
             if ("PARM".equals(msg.description.name)) {
                 parameters.put((String) msg.get("Name"), msg.get("Value"));
+            }
+
+            if ("GPS".equals(msg.description.name)) {
+                if (utcTimeReference < 0) {
+                    try {
+                        if (formatPX4) {
+                            int fix = ((Number) msg.get("Fix")).intValue();
+                            long gpsT = ((Number) msg.get("GPSTime")).longValue();
+                            if (fix >= 3 && gpsT > 0) {
+                                utcTimeReference = gpsT - timeEnd;
+                            }
+                        } else {
+                            int fix = ((Number) msg.get("Status")).intValue();
+                            int week = ((Number) msg.get("Week")).intValue();
+                            long ms = ((Number) msg.get("TimeMS")).longValue();
+                            if (fix >= 3 && (week > 0 || ms > 0)) {
+                                long leapSeconds = 16;
+                                long gpsT = ((315964800L + week * 7L * 24L * 3600L - leapSeconds) * 1000 + ms) * 1000L;
+                                utcTimeReference = gpsT - timeEnd;
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
             }
         }
         startMicroseconds = timeStart;
@@ -225,7 +255,7 @@ public class PX4LogReader extends BinaryLogReader {
         }
     }
 
-    private long getTimestamp(PX4LogMessage msg) {
+    private long getAPMTimestamp(PX4LogMessage msg) {
         Integer idx = msg.description.fieldsMap.get("TimeMS");
         if (idx != null && idx == 0) {
             return msg.getLong(idx) * 1000;
@@ -266,7 +296,7 @@ public class PX4LogReader extends BinaryLogReader {
                 }
             } else {
                 // APM log doesn't have TIME message
-                long ts = getTimestamp(msg);
+                long ts = getAPMTimestamp(msg);
                 if (ts > 0) {
                     time = ts;
                     if (t == 0) {
