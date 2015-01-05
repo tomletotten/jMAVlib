@@ -23,4 +23,12 @@ public class RotationConversion {
         R.set(2, 2, cos(roll) * cos(pitch));
         return R;
     }
+
+    public static double[] eulerAnglesByQuaternion(double[] q) {
+        return new double[]{
+                Math.atan2(2.0 * (q[0] * q[1] + q[2] * q[3]), 1.0 - 2.0 * (q[1] * q[1] + q[2] * q[2])),
+                Math.asin(2 * (q[0] * q[2] - q[3] * q[1])),
+                Math.atan2(2.0 * (q[0] * q[3] + q[1] * q[2]), 1.0 - 2.0 * (q[2] * q[2] + q[3] * q[3])),
+        };
+    }
 }
